@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CSE160 ASGN 2</title>
+  </head>
+
+  <body onload="main()">
+    <canvas id="webgl" width="400" height="400">
+      Please use a browser that supports "canvas"
+    </canvas>
+
+    <!-- <img src="Duck Drawing.jpg" alt="Duck Drawing" style="max-width:400px; height:400px;"> -->
+
+
+    <p id="numdot"> XXX </p>
+
+    <!-- <button type="button" id="green">Green</button>
+    <button type="button" id="red">Red</button> -->
+    <button type="button" id="clearButton">Clear</button>
+    <button type="button" id="duckButton">Draw Duck</button>
+
+    <div id="scoreDisplay" style="position:absolute; top:10px; left:10px; color:white; font-size:20px;"></div>
+    <div id="gameOverDisplay" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:red; font-size:30px; display:none;"></div>
+    <button id="startButton" type="button">Start Duck Dash</button>
+
+
+    <p>
+    <button type="button" id="pointButton">Point</button>
+    <button type="button" id="triButton">Triangle</button>
+    <button type="button" id="circleButton">Circle</button>
+    </p>
+
+    <p>
+      Red
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value="100"
+        class="slider"
+        id="redSlide"
+      />
+    </p>
+
+    <p>
+      Green
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value="100"
+        class="slider"
+        id="greenSlide"
+      />
+    </p>
+
+    <p>
+      Blue
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value="100"
+        class="slider"
+        id="blueSlide"
+      />
+    </p>
+
+    <p>
+    Size
+      <input
+        type="range"
+        min="5"
+        max="40"
+        value="5"
+        class="slider"
+        id="sizeSlide"
+      />
+    </p>
+
+    <p>
+        Circle Segments
+        <input
+            type="range"
+            min="3"
+            max="30"
+            value="10"
+            class="slider"
+            id="segmentsSlide"
+        />
+    </p>
+
+      <script src="lib/webgl-utils.js"></script>
+      <script src="lib/webgl-debug.js"></script>
+      <script src="lib/cuon-utils.js"></script>
+      <script src="Circle.js"></script>
+      <script src="Traingle.js"></script>
+      <script src="Point.js"></script>
+      <script src="Cube.js"></script>
+      <script src="asgn2.js"></script>
+    </p>
+  </body>
+</html>
