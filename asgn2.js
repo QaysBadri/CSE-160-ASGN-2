@@ -2,10 +2,10 @@
 // Vertex shader program
 var VSHADER_SOURCE = `
     attribute vec4 a_Position;
-    uniform float u_Size;
+    uniform mat4 u_ModelMatrix;
+    uniform mat4 u_GlobalRotateMatrix;
     void main() {
-    gl_Position = a_Position;
-    gl_PointSize = u_Size;
+    gl_Position = u_GlobalRotateMatrix * u_ModelMatrix * a_Position;
   }`;
 
 // Fragment shader program
@@ -22,6 +22,7 @@ let gl;
 let a_Position;
 let u_FragColor;
 let u_Size;
+let u_ModelMatrix;
 
 function setupWebGL() {
   // Retrieve <canvas> element
@@ -58,12 +59,23 @@ function connectVariablesToGLSL() {
     return;
   }
 
-  // Get the storage location of u_Size
-  u_Size = gl.getUniformLocation(gl.program, "u_Size");
-  if (!u_Size) {
-    console.log("Failed to get the storage location of u_Size");
+  u_ModelMatrix = gl.getUniformLocation(gl.program, "u_ModelMatrix");
+  if (!u_ModelMatrix) {
+    console.log("Failed to get the storage location of u_ModelMatrix");
     return;
   }
+
+  u_GlobalRotateMatrix = gl.getUniformLocation(
+    gl.program,
+    "u_GlobalRotateMatrix"
+  );
+  if (!u_GlobalRotateMatrix) {
+    console.log("Failed to get the storage location of u_GlobalRotateMatrix");
+    return;
+  }
+
+  var identityM = new Matrix4();
+  gl.uniformMatrix4fv(u_ModelMatrix, false, identityM.elements);
 }
 
 // Constants
@@ -76,46 +88,51 @@ let g_selectedColor = [1.0, 1.0, 1.0, 1.0];
 let g_selectedSize = 5;
 let g_selectedType = POINT;
 let g_segments = 10;
+let g_globalAngle = 0;
+let g_yellowAngle = 0;
+let g_magnetaAngle = 0;
+let g_yellowAnimation = false;
+let g_magnetaAnimation = false;
 
 // Set up actions for the HTML UI elements
 function addActionsForHtmlUI() {
-  // Button Events (Shape Type)
-  document.getElementById("clearButton").onclick = function () {
-    g_shapesList = [];
-    renderAllShapes();
+  // Button Events
+  document.getElementById("animationYellowOnButton").onclick = function () {
+    g_yellowAnimation = true;
   };
 
-  document.getElementById("pointButton").onclick = function () {
-    g_selectedType = POINT;
-  };
-  document.getElementById("triButton").onclick = function () {
-    g_selectedType = TRIANGLE;
-  };
-  document.getElementById("circleButton").onclick = function () {
-    g_selectedType = CIRCLE;
+  document.getElementById("animationYellowOffButton").onclick = function () {
+    g_yellowAnimation = false;
   };
 
-  // Slider Events
-  document.getElementById("redSlide").addEventListener("mouseup", function () {
-    g_selectedColor[0] = this.value / 100;
-  });
-  document
-    .getElementById("greenSlide")
-    .addEventListener("mouseup", function () {
-      g_selectedColor[1] = this.value / 100;
-    });
-  document.getElementById("blueSlide").addEventListener("mouseup", function () {
-    g_selectedColor[2] = this.value / 100;
-  });
+  document.getElementById("animationMagnetaOnButton").onclick = function () {
+    g_magnetaAnimation = true;
+  };
+
+  document.getElementById("animationMagnetaOffButton").onclick = function () {
+    g_magnetaAnimation = false;
+  };
 
   // Add Slider Events
-  document.getElementById("sizeSlide").addEventListener("mouseup", function () {
-    g_selectedSize = this.value;
-  });
   document
-    .getElementById("segmentsSlide")
-    .addEventListener("mouseup", function () {
-      g_segments = this.value;
+    .getElementById("magnetaSlide")
+    .addEventListener("mousemove", function () {
+      g_magnetaAngle = this.value;
+      renderAllShapes();
+    });
+
+  document
+    .getElementById("yellowSlide")
+    .addEventListener("mousemove", function () {
+      g_yellowAngle = this.value;
+      renderAllShapes();
+    });
+
+  document
+    .getElementById("angleSlide")
+    .addEventListener("mousemove", function () {
+      g_globalAngle = this.value;
+      renderAllShapes();
     });
 }
 
@@ -133,7 +150,8 @@ function main() {
 
   // Clear <canvas>
   // gl.clear(gl.COLOR_BUFFER_BIT);
-  renderAllShapes();
+  // renderAllShapes();
+  requestAnimationFrame(tick);
 }
 
 var g_shapesList = [];
@@ -158,7 +176,21 @@ function click(ev) {
   g_shapesList.push(point);
 
   // Draw every shape that is supposed to be in the canvas
+  // renderAllShapes();
+}
+
+var g_startTime = performance.now() / 1000.0;
+var g_seconds = performance.now() / 1000.0 - g_startTime;
+
+function tick() {
+  g_seconds = performance.now() / 1000.0 - g_startTime;
+  // console.log(g_seconds);
+
+  updateAnimationAngle();
+
   renderAllShapes();
+
+  requestAnimationFrame(tick);
 }
 
 // Extract the event click and return it in WebGL coordinates
@@ -173,31 +205,58 @@ function convertCoordinatesEventToGL(ev) {
   return [x, y];
 }
 
+function updateAnimationAngle() {
+  if (g_yellowAnimation) {
+    g_yellowAngle = 45 * Math.sin(g_seconds);
+  }
+  if (g_magnetaAnimation) {
+    g_magnetaAngle = 45 * Math.sin(3 * g_seconds);
+  }
+}
+
 // Draw every shape that is supposed to be in the canvas
 function renderAllShapes() {
   // Check the time at the start of this function
   var startTime = performance.now();
 
+  var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
+  gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
+
   // Clear <canvas>
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // Draw a test traingle
-  drawTriangle3D([-1.0, 0.0, 0.0, -0.5, -1.0, 0.0, 0.0, 0.0, 0.0]);
-
-  // Draw a cube
   var body = new Cube();
   body.color = [1.0, 0.0, 0.0, 1.0];
+  body.matrix.translate(-0.25, -0.75, 0.0);
+  body.matrix.rotate(-5, 1, 0, 0);
+  body.matrix.scale(0.5, 0.3, 0.5);
   body.render();
+
+  var yellow = new Cube();
+  yellow.color = [1.0, 1.0, 0.0, 1.0];
+  yellow.matrix.setTranslate(0.0, -0.5, 0.0);
+  yellow.matrix.rotate(-5, 1, 0, 0);
+
+  yellow.matrix.rotate(-g_yellowAngle, 0, 0, 1);
+
+  var yellowCoordinatesMat = new Matrix4(yellow.matrix);
+  yellow.matrix.scale(0.25, 0.7, 0.5);
+  yellow.matrix.translate(-0.5, 0.0, 0.0);
+  yellow.render();
+
+  var magneta = new Cube();
+  magneta.color = [1.0, 0.0, 1.0, 1.0];
+  magneta.matrix = yellowCoordinatesMat;
+  magneta.matrix.translate(0, 0.65, 0);
+  magneta.matrix.rotate(g_magnetaAngle, 0, 0, 1);
+  magneta.matrix.scale(0.3, 0.3, 0.3);
+  magneta.matrix.translate(-0.5, 0, -0.001);
+  magneta.render();
 
   // Check the time at the end of the function, and show on web page
   var duration = performance.now() - startTime;
   sendTextToHTML(
-    "numdot: " +
-      len +
-      " ms: " +
-      Math.floor(duration) +
-      " fps: " +
-      Math.floor(1000 / duration),
+    " ms: " + Math.floor(duration) + " fps: " + Math.floor(1000 / duration),
     "numdot"
   );
 }
