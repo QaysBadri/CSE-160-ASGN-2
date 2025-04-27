@@ -20,10 +20,12 @@ let g_globalAngleX = 0;
 let g_headAngle = 0;
 let g_wingUpperAngle = 0;
 let g_wingLowerAngle = 0;
+let g_wingHandAngle = 0;
 
 let g_headAnimation = true;
 let g_wingUpperAnimation = false;
 let g_wingLowerAnimation = false;
+let g_wingHandAnimation = false;
 
 let g_pokeAnimationActive = false;
 let g_pokeStartTime = 0;
@@ -38,7 +40,7 @@ var g_seconds = 0;
 
 function setupWebGL() {
   canvas = document.getElementById("webgl");
-  gl = getWebGLContext(canvas, false);
+  gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
   if (!gl) {
     console.log("Failed to get the rendering context for WebGL");
     return;
@@ -95,27 +97,44 @@ function addActionsForHtmlUI() {
     });
 
   document
-    .getElementById("animationMagnetaOnButton")
+    .getElementById("wingHandSlide")
+    .addEventListener("input", function () {
+      if (!g_wingHandAnimation) {
+        g_wingHandAngle = this.value;
+      }
+    });
+
+  document
+    .getElementById("animationWingUpperOnButton")
     .addEventListener("click", function () {
       g_wingUpperAnimation = true;
     });
   document
-    .getElementById("animationMagnetaOffButton")
+    .getElementById("animationWingUpperOffButton")
     .addEventListener("click", function () {
       g_wingUpperAnimation = false;
-      g_wingUpperAngle = document.getElementById("wingUpperSlide").value;
     });
 
   document
-    .getElementById("animationYellowOnButton")
+    .getElementById("animationWingLowerOnButton")
     .addEventListener("click", function () {
       g_wingLowerAnimation = true;
     });
   document
-    .getElementById("animationYellowOffButton")
+    .getElementById("animationWingLowerOffButton")
     .addEventListener("click", function () {
       g_wingLowerAnimation = false;
-      g_wingLowerAngle = document.getElementById("wingLowerSlide").value;
+    });
+
+  document
+    .getElementById("animationHandOnButton")
+    .addEventListener("click", function () {
+      g_wingHandAnimation = true;
+    });
+  document
+    .getElementById("animationHandOffButton")
+    .addEventListener("click", function () {
+      g_wingHandAnimation = false;
     });
 }
 
@@ -140,13 +159,10 @@ function initEventHandlers() {
       let deltaX = ev.clientX - g_lastMouseX;
       let deltaY = ev.clientY - g_lastMouseY;
 
-      g_globalAngle = (g_globalAngle - deltaX * 0.5) % 360;
-      g_globalAngleX = g_globalAngleX - deltaY * 0.5;
+      g_globalAngle = (g_globalAngle - deltaX * 0.4) % 360;
+      g_globalAngleX = g_globalAngleX - deltaY * 0.4;
 
-      if (g_globalAngleX > 90) g_globalAngleX = 90;
-      if (g_globalAngleX < -90) g_globalAngleX = -90;
-
-      document.getElementById("angleSlide").value = g_globalAngle;
+      g_globalAngleX = Math.max(Math.min(g_globalAngleX, 90), -90);
 
       g_lastMouseX = ev.clientX;
       g_lastMouseY = ev.clientY;
@@ -154,7 +170,7 @@ function initEventHandlers() {
   };
 
   canvas.oncontextmenu = function (ev) {
-    if (g_isDragging) ev.preventDefault();
+    ev.preventDefault();
   };
 }
 
@@ -164,7 +180,8 @@ function main() {
   addActionsForHtmlUI();
   initEventHandlers();
 
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearColor(0.8, 0.9, 1.0, 1.0);
+
   requestAnimationFrame(tick);
 }
 
@@ -178,33 +195,48 @@ function tick() {
 function updateAnimationAngles() {
   if (g_pokeAnimationActive) {
     let pokeTime = g_seconds - g_pokeStartTime;
+    let oscillation = Math.sin(pokeTime * ((2 * Math.PI) / g_pokeDuration));
     if (pokeTime < g_pokeDuration) {
-      g_headAngle = 45 * Math.sin(pokeTime * ((4 * Math.PI) / g_pokeDuration));
+      g_headAngle = 20 * oscillation;
+      g_wingUpperAngle = 30 * oscillation;
+      g_wingLowerAngle = -20 * oscillation;
+      document.getElementById("wingUpperSlide").value = g_wingUpperAngle;
+      document.getElementById("wingLowerSlide").value = g_wingLowerAngle;
       return;
     } else {
       g_pokeAnimationActive = false;
+      if (!g_wingUpperAnimation)
+        g_wingUpperAngle = document.getElementById("wingUpperSlide").value;
+      if (!g_wingLowerAnimation)
+        g_wingLowerAngle = document.getElementById("wingLowerSlide").value;
     }
   }
 
   if (g_headAnimation) {
-    g_headAngle = 10 * Math.sin(g_seconds * 2 * Math.PI);
+    g_headAngle = 10 * Math.sin(g_seconds * Math.PI);
   } else {
-    g_headAngle = 0;
+    if (!g_pokeAnimationActive) g_headAngle = 0;
   }
 
   if (g_wingUpperAnimation) {
-    g_wingUpperAngle = 45 * Math.sin(g_seconds * 3 * Math.PI);
+    g_wingUpperAngle = 45 * Math.sin(g_seconds * 2 * Math.PI);
     document.getElementById("wingUpperSlide").value = g_wingUpperAngle;
   }
 
   if (g_wingLowerAnimation) {
-    g_wingLowerAngle = 30 * Math.sin(g_seconds * 3 * Math.PI + Math.PI / 4);
+    g_wingLowerAngle = 35 * Math.sin(g_seconds * 2 * Math.PI + Math.PI / 3);
     document.getElementById("wingLowerSlide").value = g_wingLowerAngle;
+  }
+
+  if (g_wingHandAnimation) {
+    g_wingHandAngle = 25 * Math.sin(g_seconds * 3 * Math.PI);
+    document.getElementById("wingHandSlide").value = g_wingHandAngle;
   }
 }
 
 function renderAllShapes() {
   var startTime = performance.now();
+
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   var globalRotMat = new Matrix4()
@@ -212,12 +244,13 @@ function renderAllShapes() {
     .rotate(g_globalAngleX, 1, 0, 0);
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
-  var bodyColor = [1.0, 0.9, 0.0, 1.0];
-  var headColor = [1.0, 0.95, 0.2, 1.0];
-  var wingColor = [0.95, 0.85, 0.0, 1.0];
+  var bodyColor = [1.0, 0.85, 0.0, 1.0];
+  var headColor = [1.0, 0.9, 0.1, 1.0];
+  var wingColor = [0.9, 0.8, 0.0, 1.0];
+  var handColor = [0.85, 0.75, 0.0, 1.0];
   var beakColor = [1.0, 0.6, 0.0, 1.0];
   var legColor = [1.0, 0.6, 0.0, 1.0];
-  var eyeColor = [0.0, 0.0, 0.0, 1.0];
+  var eyeColor = [0.1, 0.1, 0.1, 1.0];
 
   var body = new Cube();
   body.color = bodyColor;
@@ -234,21 +267,21 @@ function renderAllShapes() {
   head.matrix.translate(-0.5, -0.5, -0.5);
   head.render();
 
-  var eyeL = new Circle();
+  var eyeL = new Sphere();
   eyeL.color = eyeColor;
   eyeL.segments = 8;
+  eyeL.bands = 6;
   eyeL.matrix = new Matrix4(headBaseMatrix);
   eyeL.matrix.translate(0.151, 0.1, 0.1);
-  eyeL.matrix.rotate(90, 0, 1, 0);
   eyeL.matrix.scale(0.06, 0.06, 0.06);
   eyeL.render();
 
-  var eyeR = new Circle();
+  var eyeR = new Sphere();
   eyeR.color = eyeColor;
   eyeR.segments = 8;
+  eyeR.bands = 6;
   eyeR.matrix = new Matrix4(headBaseMatrix);
   eyeR.matrix.translate(0.151, 0.1, -0.1);
-  eyeR.matrix.rotate(90, 0, 1, 0);
   eyeR.matrix.scale(0.06, 0.06, 0.06);
   eyeR.render();
 
@@ -262,10 +295,10 @@ function renderAllShapes() {
 
   var wingUpperL = new Cube();
   wingUpperL.color = wingColor;
-  wingUpperL.matrix.setTranslate(0.0, 0.15, 0.25);
+  wingUpperL.matrix.setTranslate(-0.11, 0.1, 0.29);
   wingUpperL.matrix.rotate(g_wingUpperAngle, 1, 0, 0);
   var wingUpperLMatrix = new Matrix4(wingUpperL.matrix);
-  wingUpperL.matrix.scale(0.3, 0.1, 0.1);
+  wingUpperL.matrix.scale(0.3, 0.08, 0.08);
   wingUpperL.matrix.translate(0.0, -0.5, -0.5);
   wingUpperL.render();
 
@@ -273,17 +306,27 @@ function renderAllShapes() {
   wingLowerL.color = wingColor;
   wingLowerL.matrix = wingUpperLMatrix;
   wingLowerL.matrix.translate(0.3, 0, 0);
-  wingLowerL.matrix.rotate(g_wingLowerAngle, 1, 0, 0);
-  wingLowerL.matrix.scale(0.25, 0.08, 0.08);
+  wingLowerL.matrix.rotate(g_wingLowerAngle, 0, 0, 1);
+  var wingLowerLMatrix = new Matrix4(wingLowerL.matrix);
+  wingLowerL.matrix.scale(0.25, 0.07, 0.07);
   wingLowerL.matrix.translate(0.0, -0.5, -0.5);
   wingLowerL.render();
 
+  var wingHandL = new Cube();
+  wingHandL.color = handColor;
+  wingHandL.matrix = wingLowerLMatrix;
+  wingHandL.matrix.translate(0.25, 0, 0);
+  wingHandL.matrix.rotate(g_wingHandAngle, 0, 1, 0);
+  wingHandL.matrix.scale(0.1, 0.06, 0.06);
+  wingHandL.matrix.translate(0.0, -0.5, -0.5);
+  wingHandL.render();
+
   var wingUpperR = new Cube();
   wingUpperR.color = wingColor;
-  wingUpperR.matrix.setTranslate(0.0, 0.15, -0.25);
-  wingUpperR.matrix.rotate(g_wingUpperAngle, 1, 0, 0);
+  wingUpperR.matrix.setTranslate(-0.11, 0.1, -0.29);
+  wingUpperR.matrix.rotate(-g_wingUpperAngle, 1, 0, 0);
   var wingUpperRMatrix = new Matrix4(wingUpperR.matrix);
-  wingUpperR.matrix.scale(0.3, 0.1, 0.1);
+  wingUpperR.matrix.scale(0.3, 0.08, 0.08);
   wingUpperR.matrix.translate(0.0, -0.5, -0.5);
   wingUpperR.render();
 
@@ -291,10 +334,20 @@ function renderAllShapes() {
   wingLowerR.color = wingColor;
   wingLowerR.matrix = wingUpperRMatrix;
   wingLowerR.matrix.translate(0.3, 0, 0);
-  wingLowerR.matrix.rotate(g_wingLowerAngle, 1, 0, 0);
-  wingLowerR.matrix.scale(0.25, 0.08, 0.08);
+  wingLowerR.matrix.rotate(-g_wingLowerAngle, 0, 0, 1);
+  var wingLowerRMatrix = new Matrix4(wingLowerR.matrix);
+  wingLowerR.matrix.scale(0.25, 0.07, 0.07);
   wingLowerR.matrix.translate(0.0, -0.5, -0.5);
   wingLowerR.render();
+
+  var wingHandR = new Cube();
+  wingHandR.color = handColor;
+  wingHandR.matrix = wingLowerRMatrix;
+  wingHandR.matrix.translate(0.25, 0, 0);
+  wingHandR.matrix.rotate(-g_wingHandAngle, 0, 1, 0);
+  wingHandR.matrix.scale(0.1, 0.06, 0.06);
+  wingHandR.matrix.translate(0.0, -0.5, -0.5);
+  wingHandR.render();
 
   const upperLegHeight = 0.2;
   const lowerLegHeight = 0.15;
